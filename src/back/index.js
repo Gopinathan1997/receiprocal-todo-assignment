@@ -199,13 +199,13 @@ const initializeDbAndServer = async () => {
 
 initializeDbAndServer();
 
-function authenticateToken(request, response, next) {
+const authenticateToken = (request, response, next) => {
   let jwtToken;
+  console.log(request.authHeader);
 
-  const authHeader = request.headers["Authorization"];
+  const authHeader = request.headers["authorization"];
   if (authHeader !== undefined) {
     jwtToken = authHeader.split(" ")[1];
-    
   }
   if (jwtToken === undefined) {
     response.status(401);
@@ -220,7 +220,7 @@ function authenticateToken(request, response, next) {
       }
     });
   }
-}
+};
 
 app.post("/register", async (req, res) => {
   const { username, password, role } = req.body;
@@ -278,7 +278,7 @@ app.post("/login", async (req, res) => {
     if (isPasswordMatched) {
       const payload = { username: username };
       const jwtToken = jwt.sign(payload, "MY_SECRET_TOKEN");
-      
+
       return res.json({ jwtToken, message: "Login success!" });
     } else {
       return res.status(400).json({ error: "Invalid Password" });
@@ -289,9 +289,113 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.get("/projects", authenticateToken, async (req, res) => {
+app.get("/projects", async (req, res) => {
+  const { username } = req.query;
+  console.log(username);
+
   try {
-    const { username } = req.user; // Extracted from the JWT token
+    // Get the user by username
+    const user = await db.get("SELECT * FROM users WHERE username = ?", [
+      username,
+    ]);
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    // Get projects associated with the userId
+    const projects = await db.all(
+      `SELECT DISTINCT projects.projectName, projects.projectId 
+FROM projects
+JOIN user_projects ON projects.projectId = user_projects.projectId
+WHERE user_projects.userId = ?;`,
+      [user.userId]
+    );
+
+    if (projects.length === 0) {
+      return res.status(200).send("No projects found for this user");
+    }
+
+    res.status(200).json({ projects });
+  } catch (err) {
+    console.error("Error fetching projects:", err);
+    res.status(500).send("Server error fetching projects");
+  }
+});
+
+app.get("/tasks", async (req, res) => {
+  const { username } = req.query;
+  console.log(username);
+
+  try {
+    // Get the user by username
+    const user = await db.get("SELECT * FROM users WHERE username = ?", [
+      username,
+    ]);
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    // Get tasks associated with the userId
+    const tasks = await db.all(
+      `SELECT DISTINCT tasks.taskName,tasks.taskStatus,tasks.taskId
+FROM tasks
+JOIN task_projects ON tasks.taskId = task_projects.taskId
+JOIN user_projects ON user_projects.projectId = task_projects.projectId
+WHERE user_projects.userId = ?;`,
+      [user.userId]
+    );
+
+    if (tasks.length === 0) {
+      return res.status(200).send("No tasks found for this user");
+    }
+
+    res.status(200).json({ tasks });
+  } catch (err) {
+    console.error("Error fetching projects:", err);
+    res.status(500).send("Server error fetching projects");
+  }
+});
+
+app.get("/projects/:projectId", async (req, res) => {
+  const { projectId, username } = req.query;
+  console.log(username);
+
+  try {
+    // Get the user by username
+    const user = await db.get("SELECT * FROM users WHERE username = ?", [
+      username,
+    ]);
+
+    if (!user) {
+      return res.status(404).send("User not found");
+    }
+
+    // Get projects associated with the userId
+    const tasks = await db.all(
+      `SELECT DISTINCT tasks.taskName,tasks.taskStatus,tasks.taskId
+FROM tasks
+JOIN task_projects ON tasks.taskId = task_projects.taskId 
+JOIN projects ON projects.projectId = task_projects.projectId
+WHERE task_projects.projectId = ?;`,
+      [user.userId]
+    );
+
+    if (tasks.length === 0) {
+      return res.status(200).send("No tasks found for this Project");
+    }
+
+    res.status(200).json({ projects });
+  } catch (err) {
+    console.error("Error fetching task:", err);
+    res.status(500).send("Server error fetching tasks");
+  }
+});
+
+app.get("/", authenticateToken, async (req, res) => {
+  try {
+    const { username } = req.user;
 
     const selectUserQuery = `SELECT * FROM users WHERE username = ?;`;
     const databaseUser = await db.get(selectUserQuery, [username]);
