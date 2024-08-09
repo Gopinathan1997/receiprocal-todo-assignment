@@ -1,0 +1,25 @@
+.form-container {
+  width: 30%;
+  height: auto;
+  background-color: aliceblue;
+  padding: 20px 40px;
+  border-radius: 15px;
+  display: flex;
+  justify-content: start;
+  align-items: flex-start;
+  border: 3px solid white;
+}
+.registration-container {
+  background-color: pink;
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+input {
+  width: 100% !important;
+}
+label{
+    font-weight: 400;
+}
