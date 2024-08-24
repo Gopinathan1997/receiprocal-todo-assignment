@@ -59,7 +59,7 @@ const initializeDbAndServer = async () => {
     await db.run(`
       CREATE TABLE IF NOT EXISTS projects (
         projectId INTEGER PRIMARY KEY AUTOINCREMENT,
-        projectName TEXT NOT NULL
+        projectName TEXT NOT NULL UNIQUE
       )
     `);
 
@@ -87,8 +87,8 @@ const initializeDbAndServer = async () => {
         userProjectId INTEGER PRIMARY KEY AUTOINCREMENT,
         userId INTEGER,
         projectId INTEGER,
-        FOREIGN KEY (userId) REFERENCES users(userId),
-        FOREIGN KEY (projectId) REFERENCES projects(projectId)
+        FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE ,
+        FOREIGN KEY (projectId) REFERENCES projects(projectId) ON DELETE CASCADE 
       )
     `);
 
@@ -119,20 +119,20 @@ const initializeDbAndServer = async () => {
     await db.run(`
       CREATE TABLE IF NOT EXISTS tasks (
         taskId INTEGER PRIMARY KEY AUTOINCREMENT,
-        taskName TEXT NOT NULL,
+        taskName TEXT NOT NULL UNIQUE,
         taskStatus TEXT NOT NULL
       )
     `);
 
     const sampleTasks = [
-      { taskName: "Authentication Handling", taskStatus: "todo" },
-      { taskName: "Create Nav-Bar", taskStatus: "completed" },
-      { taskName: "Cart Page", taskStatus: "in_progress" },
-      { taskName: "Home Page", taskStatus: "in_progress" },
-      { taskName: "Payment Page", taskStatus: "in_progress" },
-      { taskName: "Database Management", taskStatus: "todo" },
-      { taskName: "Front-End Management", taskStatus: "todo" },
-      { taskName: "Server Management", taskStatus: "todo" },
+      { taskName: "Authentication Handling", taskStatus: "Todo" },
+      { taskName: "Create Nav-Bar", taskStatus: "Completed" },
+      { taskName: "Cart Page", taskStatus: "In Progress" },
+      { taskName: "Home Page", taskStatus: "In Progress" },
+      { taskName: "Payment Page", taskStatus: "In Progress" },
+      { taskName: "Database Management", taskStatus: "Todo" },
+      { taskName: "Front-End Management", taskStatus: "Todo" },
+      { taskName: "Server Management", taskStatus: "Todo" },
     ];
 
     for (const task of sampleTasks) {
@@ -148,14 +148,25 @@ const initializeDbAndServer = async () => {
       }
     }
 
+    // Create user_tasks table
+    await db.run(`
+      CREATE TABLE IF NOT EXISTS user_tasks (
+        userTaskId INTEGER PRIMARY KEY AUTOINCREMENT,
+        taskId INTEGER,
+        userId INTEGER,
+        FOREIGN KEY (userId) REFERENCES users(userId) ON DELETE CASCADE ,
+        FOREIGN KEY (taskId) REFERENCES tasks(taskId) ON DELETE CASCADE 
+      )
+    `);
+
     // Create task_projects table
     await db.run(`
       CREATE TABLE IF NOT EXISTS task_projects (
         taskProjectId INTEGER PRIMARY KEY AUTOINCREMENT,
         taskId INTEGER,
         projectId INTEGER,
-        FOREIGN KEY (taskId) REFERENCES users(taskId),
-        FOREIGN KEY (projectId) REFERENCES projects(projectId)
+        FOREIGN KEY (taskId) REFERENCES users(taskId) ON DELETE CASCADE ,
+        FOREIGN KEY (projectId) REFERENCES projects(projectId) ON DELETE CASCADE 
       )
     `);
 
@@ -201,8 +212,6 @@ initializeDbAndServer();
 
 const authenticateToken = (request, response, next) => {
   let jwtToken;
-  console.log(request.authHeader);
-
   const authHeader = request.headers["authorization"];
   if (authHeader !== undefined) {
     jwtToken = authHeader.split(" ")[1];
@@ -276,10 +285,14 @@ app.post("/login", async (req, res) => {
       databaseUser.password
     );
     if (isPasswordMatched) {
-      const payload = { username: username };
+      const payload = { username: username, role: databaseUser.role };
       const jwtToken = jwt.sign(payload, "MY_SECRET_TOKEN");
 
-      return res.json({ jwtToken, message: "Login success!" });
+      return res.json({
+        jwtToken,
+        role: databaseUser.role,
+        message: "Login success!",
+      });
     } else {
       return res.status(400).json({ error: "Invalid Password" });
     }
@@ -289,9 +302,27 @@ app.post("/login", async (req, res) => {
   }
 });
 
-app.get("/projects", async (req, res) => {
+app.get("/allprojects", authenticateToken, async (req, res) => {
+  try {
+    // Get projects associated with the userId
+    const allprojects = await db.all(
+      `SELECT distinct * 
+FROM projects`
+    );
+
+    if (allprojects.length === 0) {
+      return res.status(200).send("No projects found ");
+    }
+
+    res.status(200).json({ allprojects });
+  } catch (err) {
+    console.error("Error fetching projects:", err);
+    res.status(500).send("Server error fetching projects");
+  }
+});
+
+app.get("/projects", authenticateToken, async (req, res) => {
   const { username } = req.query;
-  console.log(username);
 
   try {
     // Get the user by username
@@ -323,9 +354,27 @@ WHERE user_projects.userId = ?;`,
   }
 });
 
+app.get("/alltasks", authenticateToken, async (req, res) => {
+  try {
+    // Get projects associated with the userId
+    const allTasks = await db.all(
+      `SELECT  * 
+FROM tasks`
+    );
+
+    if (allTasks.length === 0) {
+      return res.status(200).send("No Tasks found ");
+    }
+
+    res.status(200).json({ allTasks });
+  } catch (err) {
+    console.error("Error fetching projects:", err);
+    res.status(500).send("Server error fetching projects");
+  }
+});
+
 app.get("/tasks", async (req, res) => {
   const { username } = req.query;
-  console.log(username);
 
   try {
     // Get the user by username
@@ -340,10 +389,10 @@ app.get("/tasks", async (req, res) => {
     // Get tasks associated with the userId
     const tasks = await db.all(
       `SELECT DISTINCT tasks.taskName,tasks.taskStatus,tasks.taskId
-FROM tasks
-JOIN task_projects ON tasks.taskId = task_projects.taskId
-JOIN user_projects ON user_projects.projectId = task_projects.projectId
-WHERE user_projects.userId = ?;`,
+      FROM tasks
+      JOIN task_projects ON tasks.taskId = task_projects.taskId
+      JOIN user_projects ON user_projects.projectId = task_projects.projectId
+      WHERE user_projects.userId = ?;`,
       [user.userId]
     );
 
@@ -358,60 +407,48 @@ WHERE user_projects.userId = ?;`,
   }
 });
 
-app.get("/projects/:projectId", async (req, res) => {
-  const { projectId, username } = req.query;
-  console.log(username);
+app.post("/newtask", async (req, res) => {
+  // Assuming taskName and projectId are directly in req.body
+  const { input, projectId } = req.body;
 
   try {
-    // Get the user by username
-    const user = await db.get("SELECT * FROM users WHERE username = ?", [
-      username,
-    ]);
+    // Use placeholders to avoid SQL injection
+    const result = await db.run(
+      "INSERT INTO tasks (taskName, taskStatus) VALUES (?, 'Todo')",
+      [input]
+    );
+    const taskId = result.lastID;
+    console.log(`Task created with ID: ${taskId}`);
 
-    if (!user) {
-      return res.status(404).send("User not found");
-    }
-
-    // Get projects associated with the userId
-    const tasks = await db.all(
-      `SELECT DISTINCT tasks.taskName,tasks.taskStatus,tasks.taskId
-FROM tasks
-JOIN task_projects ON tasks.taskId = task_projects.taskId 
-JOIN projects ON projects.projectId = task_projects.projectId
-WHERE task_projects.projectId = ?;`,
-      [user.userId]
+    // Insert the taskId and projectId into the task_projects table
+    await db.run(
+      "INSERT INTO task_projects (taskId, projectId) VALUES (?, ?)",
+      [taskId, projectId]
     );
 
-    if (tasks.length === 0) {
-      return res.status(200).send("No tasks found for this Project");
+    // Fetch all users to assign the task randomly
+    const users = await db.all("SELECT * FROM users");
+    if (users.length === 0) {
+      throw new Error("No users available to assign the task");
     }
 
-    res.status(200).json({ projects });
+    // Select a random user and assign the task
+    const randomUser = users[Math.floor(Math.random() * users.length)];
+    const userId = randomUser.userId;
+    await db.run("INSERT INTO user_tasks (taskId, userId) VALUES (?, ?)", [
+      taskId,
+      userId,
+    ]);
+
+    res.status(201).json({ message: "Task created successfully" });
   } catch (err) {
-    console.error("Error fetching task:", err);
-    res.status(500).send("Server error fetching tasks");
-  }
-});
-
-app.get("/", authenticateToken, async (req, res) => {
-  try {
-    const { username } = req.user;
-
-    const selectUserQuery = `SELECT * FROM users WHERE username = ?;`;
-    const databaseUser = await db.get(selectUserQuery, [username]);
-
-    const selectProjectsQuery = `
-      SELECT projects.projectName
-      FROM projects
-      JOIN user_projects ON projects.projectId = user_projects.projectId
-      WHERE user_projects.userId = ?;
-    `;
-    const projects = await db.all(selectProjectsQuery, [databaseUser.id]);
-
-    return res.status(200).json(projects);
-  } catch (err) {
-    console.error("Error fetching projects:", err);
-    return res.status(500).json({ error: "Server error fetching projects" });
+    if (err.code === "SQLITE_CONSTRAINT") {
+      console.log(err);
+      res.status(400).json({ error: "Task name must be unique" });
+    } else {
+      console.error("Error creating task:", err);
+      res.status(500).json({ error: "An error occurred" });
+    }
   }
 });
 
