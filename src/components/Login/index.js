@@ -3,6 +3,8 @@ import { Navigate, Link } from "react-router-dom";
 import Cookies from "js-cookie";
 import "./index.css";
 
+let role;
+
 class Login extends Component {
   state = { username: "", password: "", showSubmitError: false, errorMsg: "" };
 
@@ -16,7 +18,8 @@ class Login extends Component {
 
   onSubmitSuccess = (jwtToken) => {
     const { username } = this.state;
-    Cookies.set("username", username);
+    Cookies.set("username", username, { expires: 30 });
+    localStorage.setItem("jwt_token", jwtToken);
     Cookies.set("jwt_token", jwtToken, { expires: 30 });
     this.setState({ redirectToHome: true });
   };
@@ -40,6 +43,8 @@ class Login extends Component {
     //try {
     const response = await fetch(apiUrl, options);
     const data = await response.json();
+    role = data.role;
+    console.log(role);
     const jwtToken = data.jwtToken;
 
     if (response.ok) {
@@ -57,9 +62,19 @@ class Login extends Component {
     const { username, password, showSubmitError, errorMsg, redirectToHome } =
       this.state;
     const token = Cookies.get("jwt_token");
-    if (token !== undefined || redirectToHome) {
-      return <Navigate to="/" />;
+    
+    if (token !== undefined) {
+      if (role === "admin") {
+        return <Navigate to="/admin" />;
+      } else {
+        return <Navigate to="/" />;
+      }
     }
+
+    if (redirectToHome && role === "admin") {
+      return <Navigate to="/admin" />;
+    }
+
     return (
       <div className="login-container">
         <form className="form-container" onSubmit={this.submitForm}>

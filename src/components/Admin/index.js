@@ -3,7 +3,9 @@ import Cookies from "js-cookie";
 import { DNA } from "react-loader-spinner";
 import "./index.css";
 import { useNavigate } from "react-router-dom";
-const Home = () => {
+import Manage from "../Manage";
+
+const Admin = () => {
   const username = Cookies.get("username");
   const projectUrl = `http://localhost:3001/projects?username=${username}`;
   const taskUrl = `http://localhost:3001/tasks?username=${username}`;
@@ -12,9 +14,16 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [istaskLoading, setIsTaskLoading] = useState(false);
-  const [input, setInput] = useState("");
-  const [switchh, switchControl] = useState(false);
-  const history = useNavigate()
+
+ 
+  const [isToggled, setIsToggled] = useState(true);
+  const history = useNavigate();
+
+  
+
+  const handleChange = () => {
+    setIsToggled(!isToggled);
+  };
 
   useEffect(() => {
     const fetchProjects = async () => {
@@ -50,7 +59,7 @@ const Home = () => {
 
         if (response.ok) {
           const data = await response.json();
-          console.log(data);
+         
           setTasks(data.tasks);
         } else {
           setError("Failed to fetch tasks");
@@ -74,6 +83,8 @@ const Home = () => {
     history("/login", { replace: true });
   };
 
+ 
+
   return (
     <div className=" p-3 mb-2 bg-info-subtle text-info-emphasis home-page">
       <>
@@ -89,69 +100,93 @@ const Home = () => {
               />
               {username} To-do's
             </a>
+            <div className="text-center mt-1">
+              <button
+                onClick={handleChange}
+                className={`btn  ${
+                  isToggled ? "btn-primary" : "btn-success text-white"
+                }`}
+              >
+                {isToggled ? "Home" : "Manage"}
+              </button>
+            </div>
             <button onClick={onloggingOut} className="btn btn-primary mb-3">
               Logout
             </button>
           </div>
         </nav>
-        <h1>Projects</h1>
-        {isLoading ? (
-          <DNA
-            visible={true}
-            height="80"
-            width="80"
-            ariaLabel="dna-loading"
-            wrapperStyle={{}}
-            wrapperClass="dna-wrapper"
-          />
-        ) : (
+
+        {isToggled ? (
           <>
-            {projects.length > 0 ? (
-              <ul>
-                {projects.map((eachProject) => (
-                  <li key={eachProject.projectId}>{eachProject.projectName}</li>
-                ))}
-              </ul>
+            <h1>Projects</h1>
+            {isLoading ? (
+              <DNA
+                visible={true}
+                height="80"
+                width="80"
+                ariaLabel="dna-loading"
+                wrapperStyle={{}}
+                wrapperClass="dna-wrapper"
+              />
             ) : (
-              <p>No Projects Assigned Yet</p>
-            )}
-          </>
-        )}
-
-        <h1>Tasks</h1>
-
-        {istaskLoading ? (
-          <DNA
-            visible={true}
-            height="80"
-            width="80"
-            ariaLabel="dna-loading"
-            wrapperStyle={{}}
-            wrapperClass="dna-wrapper"
-          />
-        ) : (
-          <>
-            {tasks.length > 0 ? (
-              <ul>
-                {tasks.map((eachtask) => (
-                  <li className="list-group-item d-block" key={eachtask.taskId}>
-                    <ul class="list-group list-group-horizontal">
-                      <li class="list-group-item w-50">{eachtask.taskName}</li>
-                      <li class="list-group-item w-25">
-                        {eachtask.taskStatus}
+              <>
+                {projects.length > 0 ? (
+                  <ul>
+                    {projects.map((eachProject) => (
+                      <li key={eachProject.projectId}>
+                        {eachProject.projectName}
                       </li>
-                    </ul>
-                  </li>
-                ))}
-              </ul>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No Projects Assigned Yet</p>
+                )}
+              </>
+            )}
+
+            <h1>Tasks</h1>
+
+            {istaskLoading ? (
+              <DNA
+                visible={true}
+                height="80"
+                width="80"
+                ariaLabel="dna-loading"
+                wrapperStyle={{}}
+                wrapperClass="dna-wrapper"
+              />
             ) : (
-              <p>No Projects Assigned Yet</p>
+              <>
+                {tasks.length > 0 ? (
+                  <ul>
+                    {tasks.map((eachtask) => (
+                      <li
+                        className="list-group-item d-block"
+                        key={eachtask.taskId}
+                      >
+                        <ul class="list-group list-group-horizontal">
+                          <li class="list-group-item w-50">
+                            {eachtask.taskName}
+                          </li>
+                          <li class="list-group-item w-25">
+                            {eachtask.taskStatus}
+                          </li>
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No Projects Assigned Yet</p>
+                )}
+              </>
             )}
           </>
+        ) : (
+          <Manage />
         )}
       </>
     </div>
   );
 };
 
-export default Home;
+export default Admin;

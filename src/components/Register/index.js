@@ -1,118 +1,87 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Component } from "react";
+import { Navigate } from "react-router-dom";
+import Cookies from "js-cookie";
 import "./index.css";
 
+class Register extends Component {
+  state = { username: "", password: "", showSubmitError: false, errorMsg: "" };
 
-function Register() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("member");
-  const [errMsg, setErrMsg] = useState("");
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log(role);
-
-    if (!username || !password || !role) {
-      setErrMsg("All fields are required.");
-      return;
-    }
-
-    if (password.length < 7) {
-      setErrMsg("Password is too short");
-      return;
-    }
-
-    try {
-      const response = await fetch("http://localhost:3001/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          username,
-          password,
-          role,
-        }),
-      });
-
-      const text = await response.text();
-      setErrMsg(text);
-      console.log("Raw response text:", text);
-    } catch (error) {
-      console.log(error);
-      setErrMsg("Error Occurred");
-    }
+  onChangeUsername = (event) => {
+    this.setState({ username: event.target.value });
   };
 
-  return (
-    <div className="registration-container">
-      <form className="form-container" onSubmit={handleSubmit}>
-        <h1 className="text-center">Registration Form</h1>
-        <div>
-          <div class="mb-3">
-            <label for="exampleFormControlInput1" class="form-label">
-              Username
+  onChangePassword = (event) => {
+    this.setState({ password: event.target.value });
+  };
+
+  onSubmitSuccess = (jwtToken) => {
+    const { history } = this.props;
+    Cookies.set("jwt_token", jwtToken, {
+      expires: 30,
+    });
+    history.replace("/");
+  };
+
+  onSubmitFailure = (errorMsg) => {
+    this.setState({ errorMsg, showSubmitError: true });
+  };
+
+  submitForm = async (event) => {
+    event.preventDefault();
+    // Submit form logic
+  };
+
+  render() {
+    const { username, password, showSubmitError, errorMsg } = this.state;
+    const token = Cookies.get("jwt_token");
+    if (token !== undefined) {
+      return <Navigate to="/" />;
+    }
+    return (
+      <div className="login-container">
+        <form className="form-container" onSubmit={this.submitForm}>
+          <h1>Register Form</h1>
+          <div className="input-container">
+            <label className="input-label" htmlFor="username">
+              USERNAME
             </label>
             <input
               type="text"
-              class="form-control"
-              id="exampleFormControlInput1"
-              placeholder="Enter Username"
+              id="username"
               value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                setErrMsg("");
-              }}
+              className="username-input-field"
+              onChange={this.onChangeUsername}
+              placeholder="Username"
             />
           </div>
-        </div>
-        <div>
-          <label for="inputPassword5" class="form-label">
-            Password
-          </label>
-          <input
-            type="password"
-            id="inputPassword5"
-            class="form-control"
-            aria-describedby="passwordHelpBlock"
-            placeholder="Enter Password"
-            value={password}
-            onChange={(e) => {
-              setPassword(e.target.value);
-              setErrMsg("");
-            }}
-          />
-          <div id="passwordHelpBlock" class="form-text">
-            Your password must be 8-20 characters.
+          <div className="input-container">
+            <label className="input-label" htmlFor="password">
+              PASSWORD
+            </label>
+            <input
+              type="password"
+              id="password"
+              value={password}
+              className="password-input-field"
+              onChange={this.onChangePassword}
+              placeholder="Password"
+            />
           </div>
-        </div>
-        <div>
           <label htmlFor="role">Role</label>
-          <select
-            class="form-select"
-            aria-label="Default select example"
-            id="role"
-            onChange={(e) => {
-              console.log(e.target.value);
-              setRole(e.target.value);
-            }}
-          >
-            <option value="" selected disabled>
-              Select a role
-            </option>
+          <select id="role" name="role">
             <option value="admin">Admin</option>
-            <option value="member">Member</option>
+            <option selected value="member">
+              Member
+            </option>
           </select>
-        </div>
-        <button className="btn btn-primary mt-2" type="submit">
-          Register
-        </button>
-        <p>{errMsg}</p>
-        <Link to="/login">Already User ?</Link>
-      </form>
-    </div>
-  );
+          <button type="submit" className="login-button">
+            Register
+          </button>
+          {showSubmitError && <p className="error-message">*{errorMsg}</p>}
+        </form>
+      </div>
+    );
+  }
 }
 
 export default Register;
